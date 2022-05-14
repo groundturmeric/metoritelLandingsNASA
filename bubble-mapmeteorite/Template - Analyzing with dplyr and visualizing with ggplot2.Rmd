@@ -1,0 +1,486 @@
+---
+title: "Analyzing and visualizing distributions: dplyr and ggplot2"
+date: "2022-02-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Getting set up
+
+In this demonstration, we're going to work through a sequence of activities to analyze and visualize distributions of temperature change data using two libraries in R: dplyr and ggplot2. Both of these libraries are in the *tidyverse*, so we must first begin by loading the tidyverse with library().
+
+Make sure to run the chunk below to get tidyverse loaded.
+
+```{r setup, include=FALSE}
+
+# This stuff on the next line is
+# automatically generated for our Markdown file;
+# it's a setting that is used when knitting,
+# so we don't need to worry about it or 
+# do anything special with it
+knitr::opts_chunk$set(echo = TRUE)
+
+# But there is something in this chunk 
+# that we DO need to do:
+# Make sure to load tidyverse!
+library(tidyverse)
+
+```
+
+
+## Loading data
+https://data.nasa.gov/Space-Science/Meteorite-Landings/gh4g-9sfh
+
+
+```{r loaddata}
+
+# Read the original data from file
+original.data <- read_csv("./data/Meteorite_Landings.csv")
+
+```
+
+
+```{r dplyr1}
+# piping to find aaverage temp of 2015:
+# Filter data for 2015 only;
+# group by Area (country);
+# compute mean TempChangeC
+
+original.data %>% filter(year == 2015) %>% group_by(Area) %>% summarize( avg.change.2015 = mean(TempChangeC, na.rm=TRUE) )
+
+# to calculate two values in summarize
+data %>% filter(Year =="Y2015") %>% group_by(Area) %>% summarize( avg.change.2015 = mean(TempChangeC, na.rm=TRUE), avg.stdev = mean(StdDev, na.rm=TRUE) )
+
+
+
+
+```
+
+This gives us mean values for TempChangeC, per country, only for the year 2015. Since our data extend all the way from 1961 to 2019, we can repeat this procedure for two more years of interest -- 1965 and 1990 -- to capture snapshots of how mean temperature changes have changed over time.
+
+```{r dplyr2}
+
+# mean values of TempChangeC for year 1965
+data.1965 <- data %>% filter(Year == "Y1965") %>% 
+  group_by(Area, Year) %>%
+  summarize(avg.change = mean(TempChangeC, na.rm=TRUE))
+
+# mean values of TempChangeC for year 1990
+data.1990 <- data %>% filter(Year == "Y1990") %>% 
+  group_by(Area, Year) %>%
+  summarize(avg.change = mean(TempChangeC, na.rm=TRUE))
+
+# mean values of TempChangeC for year 2015
+data.2015 <- data %>% filter(Year == "Y2015") %>% 
+  group_by(Area, Year) %>%
+  summarize(avg.change = mean(TempChangeC, na.rm=TRUE))
+
+# Examine the contents of each new object
+data.1965
+data.1990
+data.2015
+
+```
+
+We now have distributions of mean temperature changes, per country, for 3 different time points (years). Let's start to compare these distributions by looking at their center and dispersion.
+
+In the code chunk below, we will compute mean, median, min, max, and standard deviation values for the distribution of just one year at a time.
+
+```{r dplyr3}
+
+# This won't work! Why?
+# data.1965 is a data frame, but
+# we need to pass a vector in to
+# the mean() function
+
+
+# mean(data.1965, na.rm=TRUE)  this wont work
+
+mean(data.1965$avg.change, na.rm=TRUE)
+
+# Or:
+
+# We can turn a column of a data frame
+# into a vector by using dplyr pull(COLUMN_NAME)    
+# IT GIVES BACK A VECTOR!!!! c(v1, v2, v3,...)
+data.1965 %>% pull(avg.change) 
+
+#if we use select() we get a data frame!
+
+
+
+# Then, we can pass this vector directly
+# into mean() -- even by putting the
+# piped expression inside the function
+
+mean(data.1965 %>% pull(avg.change), na.rm=TRUE)
+
+#this also works but wasn't demonstrated in class
+data.1965 %>% pull(avg.change) %>% mean(na.rm=TRUE)
+
+
+# Let's use the same procedure to calculate
+# median, min, max, and standard deviation
+# values for avg.change
+
+avg.change.1965 <- data.1965 %>% pull(avg.change)
+
+mean(data.1965 %>% pull(avg.change), na.rm=TRUE)
+median(data.1965 %>% pull(avg.change), na.rm=TRUE)
+min(data.1965 %>% pull(avg.change), na.rm=TRUE)
+max(data.1965 %>% pull(avg.change), na.rm=TRUE)
+sd(data.1965 %>% pull(avg.change), na.rm=TRUE)
+
+
+
+```
+
+We'll repeat the same procedure for the other 2 years of our focus.
+
+
+```{r dplyr4}
+
+# Repeat the procedure above for year 1990
+avg.change.1990 <- data.1990 %>% pull(avg.change)
+mean(avg.change.1990, na.rm = TRUE)
+median(avg.change.1990, na.rm = TRUE)
+min(avg.change.1990, na.rm = TRUE)
+max(avg.change.1990, na.rm = TRUE)
+sd(avg.change.1990, na.rm = TRUE)
+
+# Repeat the procedure above for year 2015
+avg.change.2015 <- data.2015 %>% pull(avg.change)
+mean(avg.change.2015, na.rm = TRUE)
+median(avg.change.2015, na.rm = TRUE)
+min(avg.change.2015, na.rm = TRUE)
+max(avg.change.2015, na.rm = TRUE)
+sd(avg.change.2015, na.rm = TRUE)
+
+# Create a combined data set for these 3 years
+combined.data <- bind_rows(data.1965, data.1990, data.2015)
+
+```
+
+Based on the statistics that get printed out, what can we say about our distribution? In particular, are the data normally distributed? Recall that in a normal distribution, the following things are true:
+* the mean and median (and mode) are all the same
+* the distribution of values is symmetrical, meaning there is no skew
+* the distribution of values is mesokurtic, meaning there is a specific expected probability of finding scores in specific regions of the distribution
+
+Importantly, all of these properties must be considered in tandem -- we can't use any single property by itself to declare if a distribution is normal or not.
+
+A critical missing piece at this point is visual interpretation: if we can visualize our data, we can get a better sense about whether or not the data are normally distributed.
+
+# Visualizing the data with ggplot2
+
+The statistics we've calculated above offer interesting insights into our distributions -- but they're still abstract numbers! To truly get a sense of the shapes of these distributions, we need to represent them in a visual form. In the tidyverse, there is a library that will enable us to create visualizations in powerful ways: ggplot2.
+
+The ggplot2 library is built on the *grammar of graphics*. The grammar of graphics conceptualizes charts as being composed of several different layers of information:
+* data
+* aesthetics (mapping)
+* geometries
+* facets
+* stats
+* coordinates
+* themes
+
+A minimum of **data, aesthetics, and geometries** is required to create a graph. In the next sections, we will see how to create a few different kinds of visualizations using our data from above.
+
+## Creating quick plots with qplot()
+
+ggplot2 is a powerful library for creating visualizations of data. The library provides many functions for creating many different kinds of visualizations. In this first section, we will explore a function that is built into ggplot2 for quickly creating visualizations: qplot().
+
+The qplot() function creates quick and dirty visualizations of data. This function accepts two primary kinds of arguments:
+1. A data set (i.e., a data frame) to be visualized
+2. A series of aesthetics that map variables in the data set to visual attributes in the chart
+
+Each of these arguments is notated by a specific name. We declare what data set to use for the visualization using the 'data' argument, and we can declare any number of aesthetics with other arguments of various names like 'x', 'y', 'size', and 'color'. Importantly, qplot() will always try to automatically guess what kind of visualization we want, based on the arguments we supply it. For example, if we supply a data set and a single x-aesthetic, we will get a bar chart or a histogram, depending on what kind of variable we are using; if we supply a data set and two continuous variables to the x- and y-aesthetics, we will get a scatter plot. This is because qplot() is making assumptions about what kinds of variables we are supplying and how they should be displayed in a visualization.
+
+Our data set is limited in the number of variables, but let's see what happens when we try to use qplot() with our data. The following two examples automatically generate a histogram and a dot plot -- all based on the kinds of variables we are passing into qplot()!
+
+```{r qplot}
+
+# A histogram, created with 1 continuous variable
+# qplot makes assumption depending on input, here one dimension continuous scale
+qplot(data = data.1965, x = avg.change )
+
+
+
+
+# A dot plot, with 1 discrete and 1 continuous variable
+qplot(data = combined.data, x = Year, y = avg.change)
+
+
+
+
+
+
+
+
+```
+
+qplot() is intended for quick and dirty plots; it can be used to quickly look at the distribution of a data set, but when we want more control, qplot() is going to feel very limiting. Instead, we'll want to use the full power of ggplot2 to customize what exactly our visualizations look like.
+
+The following sections demonstrate the fuller syntax of ggplot2, using the ggplot() function. This demonstration will show how to write ggplot() commands to produce a variety of different visualization types.
+
+## Creating a histogram
+
+A histogram is a very common kind of visualization in statistics. In a histogram, all of the scores in a distribution are chunked together into "bins" that all have equal width. The width of each bin can be anything, but it usually makes sense to choose a bin width that groups scores together in natural ways.
+
+For example, let's say we had a distribution of test scores that range between 50 points and 100 points. We might choose to bin scores on the test in ranges of 10 points, which means those scores between 50 - 60 points would be grouped together, scores between 60 - 70 points would be grouped together, etc. Every score in the distribution will fall into one of these bins; a histogram visualizes how many scores fall in each bin, to give a sense of the spread of a distribution.
+
+In the next code chunk, we will build up a histogram using ggplot2. Along the way, we'll demonstrate the different code components that go into creating any kind of visualization with ggplot().
+
+```{r histogram}
+# ggplot(ARGUMENT) + GEOMETRY + COORDINATES + THEME   adding layer by layer 
+# (create canvas, mapping  arguments) + geometry function + ...
+# We begin by creating a ggplot object and define the *data* and *mapping* arguments
+# Note that when we display the chart, it's empty! We haven't added any *geometries* yet
+
+ggplot(data = data.1965, mapping = aes(x = avg.change)) 
+
+
+
+
+
+
+# Then, we add a geometry -- the marks of the visualization
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram()
+
+
+
+
+
+
+# Geometries can have "aesthetics" of their own;
+# these allow us to control the appearance of marks.
+# Some aesthetics can only be used with certain geometries.
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "#4682b4")
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "yellow", color = "green", binwidth = 0.05)
+
+
+
+
+
+# We can add labels to the chart
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "yellow", color = "green", binwidth = 0.05) + labs(x = "Average change in temperature", y = "Number of countries (Areas)", title = " Average temperatures in 1965") 
+
+ggplot(data = data.1965, mapping = aes(x = avg.change)) + 
+  geom_histogram(binwidth = 0.05, fill = "pink", color = "magenta") +
+  labs(x = "Average change in temperature", y = "Number of regions", title = "Temperature changes in 1965")
+
+
+
+
+# And we can change the overall appearance
+# using theme functions
+
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "yellow", color = "green", binwidth = 0.05) + labs(x = "Average change in temperature", y = "Number of countries (Areas)", title = " Average temperatures in 1965") + theme_bw()
+
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "yellow", color = "green", binwidth = 0.05) + labs(x = "Average change in temperature", y = "Number of countries (Areas)", title = " Average temperatures in 1965") + theme_dark()
+
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + geom_histogram(fill = "yellow", color = "green", binwidth = 0.05) + labs(x = "Average change in temperature", y = "Number of countries (Areas)", title = " Average temperatures in 1965") + theme_gray()
+
+
+
+# put + sign at the end of a lign!! not at the begining!
+
+ggplot(data = data.1965, mapping = aes(x = avg.change))  + 
+  geom_histogram(fill = "#235e23", color = "green", binwidth = 0.05) + 
+  labs(x = "Average change in temperature", y = "Number of countries (Areas)", title = " Average temperatures in 1965") + 
+  theme_gray()
+
+
+
+
+
+```
+
+Based on this visualization, what can we say about our distribution? It looks like the mode is around -0.2, and the distribution looks relatively symmetrical. But there's also another small bump around -0.5; does this change our interpretation of its shape? This is something to consider as we move forward.
+
+## Creating a density plot
+
+Another very common kind of visualization in statistics is the *density plot*. These visualizations are basically just smoothed versions of histograms; they show the proportion of scores that fall in specific parts of the distribution, in terms of continuous probabilities. (The y-axis term, "probability density", simply refers to the probability of finding a score in the distribution at the given x-axis value.)
+
+The example below shows how to create a density plot with ggplot2. 
+
+```{r density1}
+
+# A density plot with custom aesthetics
+ggplot(data = data.1965, mapping = aes(x = avg.change)) +
+  geom_density(color = "white", fill= "Blue", alpha = 0.5) + 
+  labs(x= "Average change in temperature", y = "Probability Density", title = "Density chart ") + theme_grey()
+
+
+
+
+
+```
+
+What happens if we pass in our combined.data and set the 'fill' attribute inside of aes() to be mapped to Year? We get multiple density plots drawn on top of each other, each colored by year!
+
+```{r density2}
+
+# Multiple density plots in the same chart
+
+#adding change in mapping: add fill and get rid of fill in geom_density
+
+ggplot( data = combined.data, mapping = aes(x = avg.change, fill = Year)) +
+  geom_density(color = "white", alpha = 0.5) + 
+  labs(x= "Average change in temperature", y = "Probability Density", title = "density ") + theme_grey()
+
+?scale_fill_manual
+
+
+```
+
+## Creating a boxplot
+
+Continuing the theme of common visualizations in statistics, the next one we'll consider is the *boxplot*. These visualizations show us many different features of a distribution in a single chart, including the minimum and maximum values, median value, 25th and 75th percentiles, and any outliers. These charts show us both the shape of the overall distribution while also telling us key statistics about that that.
+
+
+```{r boxplot}
+
+
+# A simple boxplot
+
+
+
+
+
+# If we want to compare boxplots for the 3 years of
+# data in data.1965, data.1990, and data.2015,
+# we can combine our multiyear data and pass that
+# into ggplot2
+
+
+
+
+
+
+```
+
+## Bar charts
+
+Bar charts are typically used to show the relationship between a categorical and quantitative variable, or the frequency of observations at specific values. In ggplot2, we create a bar chart using geom_bar(). But geom_bar() assumes that the data you pass into it should be counted to determine the heights of the bars -- there's a special argument called "stat" (for "statistic") that controls this behavior.
+
+The default "stat" value for geom_bar() is set to "count," meaning "find all the observations with different values of X, and count how many observations there are for each value." In the example below, however, we don't want to create a bar chart that represents frequencies or counts. Instead, we want the bars to encode the average temperature change in 2015 for the 5 countries with the largest temperature change. To indicate this, we have to set stat = "identity" inside geom_bar(), which tells the function to use the raw values in the data as the value for bar height, instead of computing separate counts of observations.
+
+```{r barchart}
+
+# Finding the 5 countries with the greatest
+# positive average temperature change in 2015
+subsample.countries <- data.2015 %>% ungroup() %>% slice_max(avg.change, n = 5)
+
+# Create the bar chart --
+# note the use of stat = "identity" here!
+
+
+
+
+
+
+```
+
+## Layering multiple mark types
+
+In all of the examples above, we've had a single data set, matched with a single set of aesthetic mappings, matched with a single mark type (e.g., bar, histogram, boxplot). But we aren't limited in ggplot2 to creating visualizations with single mark types!
+
+Since ggplot2 is based on the grammar of graphics, we can layer up visualizations with multiple mark types to produce more complex kinds of visualizations. The next section demonstrates an example of this, using a combination of geom_density() and a new function -- geom_vline() -- to draw a vertical line at the mean of the distribution.
+
+
+```{r layer1}
+
+# First, compute the mean temperature change in 1965
+mean.1965 <- mean(data.1965 %>% pull(avg.change), na.rm = TRUE)
+
+# A layered visualization;
+# geom_vline() creates a vertical line at a given xintercept value
+
+
+
+
+
+
+```
+
+We can expand this idea further by layering density plots for the other two years to create an even more complex visualization.
+
+```{r layer2}
+
+# Compute the mean temperature change in 1990
+mean.1990 <- mean(data.1990 %>% pull(avg.change), na.rm = TRUE)
+
+# Compute the mean temperature change in 2015
+mean.2015 <- mean(data.2015 %>% pull(avg.change), na.rm = TRUE)
+
+
+# Even more layers!
+ggplot(mapping = aes(x = avg.change)) +
+  geom_vline(xintercept = mean.1965, color = "cyan", linetype = "dashed") +
+  geom_density(data = data.1965, fill = "cyan", alpha = 0.5, color = "white") +
+  geom_vline(xintercept = mean.1990, color = "yellow", linetype = "dashed") +
+  geom_density(data = data.1990, fill = "yellow", alpha = 0.5, color = "white") +
+  geom_vline(xintercept = mean.2015, color = "coral", linetype = "dashed") +
+  geom_density(data = data.2015, fill = "coral", alpha = 0.5, color = "white") +
+  labs(x = "Average temperature change", y = "Probability density") +
+  theme_bw()
+
+```
+
+The resulting visualization shows us how much the distribution of average temperature change has drifted over time -- which opens up many new directions of questions we can explore!
+
+# Checking skew and kurtosis
+
+Earlier, we calculated mean and median values for our distributions. We may have been unsure whether the differences we observed were major enough to determine whether or not our distribution is "normal".
+
+When this happens, using the mean and median as measures of normality isn't sufficient for declaring whether or not a distribution is in fact normal. We also need information about two other statistics: skew and kurtosis.
+
+Recall that *skew* refers to how much the values in a distribution are pulled in one direction versus another -- or, more simply, to what extent a distribution is *asymmetric*. Meanwhile, *kurtosis* refers to how spread out a distribution is, in terms of its width or narrowness. A *platykurtic* distribution is shorter and flatter, with more values localized in the tails of the distribution, whereas a *leptokurtic* is taller and more narrow, with more values localized in the center of the distribution.
+
+In a normal distribution, we know two things about the shape in these terms:
+* A normal distribution is symmetric, i.e., it has no skew
+* A normal distribution is "mesokurtic", meaning the bell curve doesn't have too many values localized in the tails or too many in the center of the distribution
+
+In R, there's a package called "moments" that has two functions that can calculate measures of skewness and kurtosis for us. Conveniently, those functions are called skewness() and kurtosis(), and all we need to do to use them is pass in our vector of values whose skewness and kurtosis we want to calculate.
+
+The following chunk demonstrates this on one distribution of avg.change in our data.
+
+
+```{r skew}
+
+# We will need to use functions
+# from the "moments" library.
+# Install the library first:
+install.packages("moments")
+
+# Then, load the library into the workspace:
+library(moments)
+
+# Calculate skew
+
+skewness(data.2015 %>% pull(avg.change), na.rm = TRUE)
+# gives us number which is numeric representation of skew, it's positive here. absence of skew this value is 0, the more negative, the more negative skew there is
+
+
+
+# Calculate kurtosis
+kurtosis(data.2015 %>% pull(avg.change), na.rm = TRUE)
+# value is taller than 3 so its leptopkurtic taller and narrower
+# if the value is smaller than 3 then its platykurtic shorter and narrower
+# READ BELOW 
+
+
+
+```
+
+The skewness() function returns a positive number, negative number, or 0. More negative numbers indicate stronger skew in the negative direction; more positive numbers indicate stronger skew in the positive direction; and a skewness of 0 indicates no skew at all.
+
+The kurtosis() function returns a number that quantifies the "flatness" of a distribution. Smaller numbers indicate flatter distributions, while larger numbers indicate taller and skinner distributions.
+
+In the theoretical normal distribution, skewness is 0 and kurtosis is 3. A "platykurtic" distribution has kurtosis less than 3, and a leptokurtic distribution has kurtosis greater than 3.
+
+Examine the values for skewness and kurtosis calculated above, and compare them to the expected values for the normal distribution. Are they the same? Are they different? If they are different, are they similar enough to consider them roughly equal?
+
+Finally, take into consideration all of the statistics we've calculated for our distributions -- mean, median, skewness, and kurtosis. Also consider the visual shape of the distribution. Is the distribution normal? How do we know?
+

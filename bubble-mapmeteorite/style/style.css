@@ -1,0 +1,72 @@
+.continent {
+	/* fill: #ededed; */
+	/* stroke: #d0d0d0; */
+	/* stroke-width: 0.8; */
+
+}
+
+
+body{
+	background-color: rgb(36, 41, 42);
+	/* background-color: rgb(20, 22, 22); */
+	font-family: "Times New Roman", Times, serif;
+	font-style: normal;
+}
+.dark-continent {
+	fill: #eeeeee;
+	stroke: #bbbbbb;
+}
+
+.graticule {
+	stroke: rgb(222, 222, 222);
+	stroke-width: 0.5;
+}
+
+.grid {
+	fill: none;
+	stroke: #333;
+}
+
+.circles {
+    stroke: #555155;
+    stroke-width: 0;
+}
+
+h1{
+	color: azure;
+	text-align: center;
+}
+.c2 {
+	stroke-width: 0.5;
+}
+
+.non-c2 {
+	stroke-width: 0.5
+}
+
+.diamonds {
+    stroke-width: 0;
+}
+
+
+
+
+.legend{
+	/* visibility: hidden; */
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	color: azure;
+
+}
+.tooltip {
+	color:azure;
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    visibility: hidden;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    /* font-weight: bold; */
+    font-size: 12pt;
+    background-color:rgb(66, 65, 63);
+    padding: 2px;
+    pointer-events: none;
+}
